@@ -14,3 +14,6 @@ users' preferences and interests, and adaptively recommending charts accordingly
 design and usability of our system, and satisfaction with its recommendation system and the data stories it yielded. Those studies' 
 results indicate that VisGuide can efficiently help users create coherent, personalized data stories by simultaneously and intuitively 
 supporting story presentation and chart organization.
+
+## Dataset
+[Download Datasets](https://drive.google.com/drive/folders/13CNfDDpSL_Lyk4QCw4QT9PAJfAulPEzh?usp=sharing)
