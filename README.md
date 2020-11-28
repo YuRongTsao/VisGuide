@@ -1,4 +1,4 @@
-# VisGuide
+# VisGuide: Creating Visualization Trees with User-oriented Recommendations
 
 ## Introduction
 **Data stories** are increasingly popular as a means for representing and organizing observations and patterns extracted from raw data. 
@@ -17,10 +17,31 @@ The contributions of VisGudie:
 * It  provides user-oriented recommendations using an online learning method that considers data statistics, visualization relations, and user preferences
 * It effectively uses a novel tree format, *ViStory Tree*, to support a systematic  presentation of the complex relations among multiple visualization sequences
 
+## User Interface
+
+FIG
+
+### Tree View 
+Presents the generated visualization trees.
+### Recommendation View
+Shows the next chart recommendations of the user-focused chart (Chart C). There are **Drill-down** and **Comparison** two types of the recommendation.
+### Sheet Management Bar
+Supports users to create multiple visualization trees by adding a new sheet. Users can also switch among the sheets to compare the explored results.
+
+DEMO VIDEO
+
 ## Method
+### System Overview
+### User Preference Feedback
+### Candidate Chart Generation
+### User Preference Model Training
+### ViStory Tree
+
 
 ## Evaluation
 
+
+## How to launch VisGuide
 
 
 
@@ -28,5 +49,5 @@ The contributions of VisGudie:
 [Download Datasets](https://drive.google.com/drive/folders/13CNfDDpSL_Lyk4QCw4QT9PAJfAulPEzh?usp=sharing)
 
 
-**Acknowledge**
+**Acknowledgment**
 Jia-Yu Pan, Wen-Chien Lin
