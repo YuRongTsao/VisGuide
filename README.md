@@ -98,7 +98,21 @@ The comparison charts, in contrast, present the same level of data granularity, 
 
 
 ## Evaluation
+We design two experiment to evaluate two aspect of VisGuide:
+* The usability of VisGuide  
+* If the adaptive recommendation model can match a user’s interest and if the transfered model can provide a better initial recommendations 
 
+**Study 1**
+We conduct a qualitative experiment by designing the questionnaire that comprised ten 5-point Likert-scaled items, the scale ranged from 1=``not at all'' to 5=``very much'':
+* Visual: tree layout, insight hints, easy-to-understand, flexibility
+* Story content: comprehensiveness, insightful, quality
+* Overall usability: guidance, usability, usefulness
+
+The participants gave positive ratings to all aspects of VisGuide. 
+
+FIG
+
+**Study 2**
 
 ## How to launch VisGuide
 
