@@ -37,7 +37,8 @@ Supports users to create multiple visualization trees by adding a new sheet. Use
   <img src="./img/overview.png" >
 </p>
 
-The system consists of two groups of components: a **user interface** and a **recommendation system**.
+The system consists of two groups of components: 
+a **user interface** and a **recommendation system**.
 
 The **user preference feedback module:** will collect a user's preferences to charts based on his/her interaction with the system and thus get a set of labeled charts. **Chart selection module:** allows users to show their further exploration intentions by clicking on their interested data points in charts (user-focused charts). This action will also trigger VisGuide's recommendation generation process. The recommendation system then uses the user-clicked information about the user-focused chart to generate a set of **candidates of next charts**. Besides, the labeled set of charts generated from the **user preference feedback module** will be used to **train users' preference model**. Afterwards, the recommendation system will predict the preference score of each candidate chart using the users' preference model. VisGuide then presents these charts in a descending order of preference score in the Recommendation View of the user interface.
 
@@ -67,7 +68,7 @@ VisGuide's user preference model is a linear regression model of chart features 
 * (F2) Deviation: measures the difference between the probability distribution of a recommended candidate chart and that of the reference chart. We use Jensen-Shannon divergence (JSD) to measure the difference of two distributions. Among the candidate charts, the one with larger JSD value is considered more interesting.
 * (F3) Granularity: A visualization sequence is more understandable if the charts in the sequence present the data from general to specific or reversely. The granularity feature quantifies the degree of such transitions (e.g., general-to-specific or specific-to-general) from one chart to its following recommended candidate charts. 
 * (F4) Consistence of generation operations: A visualization sequence is considered more contextual if the generation operation (i.e., drill-down or comparison) of more transitions in the sequence are the same. This feature calculates the proportion of transitions in the sequence having the same generation operation. 
-* (F5) Encoding Transitions: We record the channel encoding transition between two charts to capture a user's preference on the transition of the attributes. For example, if the $X$ channel attribute of the parent chart is *City* and that of its children chart is *Station*, the value of the feature *X-Encoding-Change* will be `City2Station`.
+* (F5) Encoding Transitions: We record the channel encoding transition between two charts to capture a user's preference on the transition of the attributes. For example, if the `X` channel attribute of the parent chart is *City* and that of its children chart is *Station*, the value of the feature *X-Encoding-Change* will be `City2Station`.
 
 **Linear Regression Model:**
 
@@ -77,7 +78,9 @@ A user-oriented recommendation has two aspects:
 
 To this end, we adopt an online machine learning method to learn users' personal preference model. We use the **stochastic gradient descent (SGD)** method to train a linear regression model that can capture the importance of each chart feature to different users by learning a user-oriented set of feature weights. This model is then used as the utility function to predict a particular user's preference score for each candidate chart. We define the utility function of a visualization as:
 
-FIG
+<p align="center">
+  <img src="./img/formula.PNG" >
+</p>
 
 * V: a visualization chart
 * w<sub>i</sub> : the weight of the i<sup>th</sup>
@@ -103,20 +106,55 @@ We design two experiment to evaluate two aspect of VisGuide:
 * If the adaptive recommendation model can match a user’s interest and if the transfered model can provide a better initial recommendations 
 
 **Study 1**
-We conduct a qualitative experiment by designing the questionnaire that comprised ten 5-point Likert-scaled items, the scale ranged from 1=``not at all'' to 5=``very much'':
+
+We conduct a qualitative experiment by designing the questionnaire that comprised ten 5-point Likert-scaled items, the scale ranged from 1=not at all to 5=very much:
 * Visual: tree layout, insight hints, easy-to-understand, flexibility
 * Story content: comprehensiveness, insightful, quality
 * Overall usability: guidance, usability, usefulness
 
 The participants gave positive ratings to all aspects of VisGuide. 
 
-FIG
+<p align="center">
+  <img src="./img/Rating.png">
+</p>
 
 **Study 2**
 
+In this study, we aim to assess 
+* If the recommendations can adapt to different users’ preferences 
+* If the model transfer  method  we  proposed  can  provide  better  initial  recommendations on datasets from different fields of applications. 
+
+We designed  a between-subjects  study to compare VisGuide against a baseline method which the  recommendation  module  does  not  adapt  to  individual user’s  preference. We used the index,**NDCG  (Normalized  Discounted  Cumulative  Gain)** and **MRR (Mean Recover Round)**, to measure the performance of VisGuide. The lower MRR means the system can adapt to the preference change fast while the higher NDCG score means the user is satisfied with the recommendation result.
+
+<p align="center">
+  <img src="./img/Result_1.png" width=300 height=200>
+  <img src="./img/Result_2.png" width=300 height=200>
+</p>
+
+
+
+To evaluate   VisGuide’s   adaptive   performance,   we   performed one-way ANOVA on the MRR of the two conditions.The left figure shows the means and 95% confidence intervals of the  participants’  MRRs.  VisGuide’s  MRR  was  significantly lower  than  that  of  the  baseline  method  (F=7.02,  p=0.009), indicating  that  VisGuide  was  able  to  adapt  to  different users’ preferences over a lower number of rounds (1.44 onaverage, as against 2.91 for the baseline system). VisGuide’s performance could also be seen as more robust in the sense that the variability in its MRR was smaller. 
+
+To evaluate the performance of our transfer mechanism, we compared the first four rounds' NDCG scores from the second session using VisGuide against the baseline method. A Kruskal-Wallis test was used for this purpose, due to the small sample size in each group.The right figure shows the means and 95\% confidence intervals of the participants' NDCG scores for the rounds in question. At the first, second, and fourth rounds, VisGuide received significantly higher NDCG scores than the baseline method did (F=4.5, p=0.03; F=3.83, p=0.05; F=5.2, p=0.02). These results imply that importing a pre-existing user-preference model is likely to provide better initial recommendations to users of data-story systems who are analyzing a dataset for the first time.
+
 ## How to launch VisGuide
+### Step1: Launch the server 
+Run `server.ipynb` with jupyter notebook
+* The server is launched if you see the following information
+![](https://i.imgur.com/4sSBjtL.png)
 
+### Step2: User interface
+* open `client/index.html` to start exploring data!
+![](https://i.imgur.com/8ci1KEK.png)
+>* check the demo vedio for details
 
+* Change dataset
+>* Dataset--> change Dataset 
+>* Model--> Transfer
+>* click "+" button
+
+* Change user
+>* click "Change user"
 
 ## Dataset
 [Download Datasets](https://drive.google.com/drive/folders/13CNfDDpSL_Lyk4QCw4QT9PAJfAulPEzh?usp=sharing)
