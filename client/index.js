@@ -64,45 +64,74 @@ function addChart2Tree(chart_data){
 
 }
 function addNode(chart_id_index){
-    //create tree_structure data
-    var tree_structure = {}
-    
     //dynamic add node   
-    var num = main_chart_id.substring(8)
-    var parent_node = $('#node_'+num)
-    if(parent_node.length==0){ //是第一張圖
-        parent_node = $('#root')
-        var parent_id = "#seq_root"
-    }else{
-        var parent_id = '#a_chart_'+num
+    
+    //create tree_structure data
+    // udpate the tree structure exist
+    var tree_structure = {}
+    child_id = '#a_chart_'+chart_id_index
+
+    if(tree_structures[curr_dataset].hasOwnProperty(curr_sheet_num-1)){ 
         tree_structure = tree_structures[curr_dataset][curr_sheet_num-1]
-    }
+ 
+        // find parent node
+        if(chart_datas[curr_dataset]["a_chart_"+chart_id_index.toString()].expandType=="1"){
+            //drill down chart
+            var num = chart_datas[curr_dataset]["a_chart_"+chart_id_index.toString()].parent_chart_id.substring(8)
+            var parent_node = $('#node_'+num)
+            var parent_id = '#a_chart_'+num
+
+            tree_structure[parent_id].push(child_id)
+        }else{
+            // comparison chart
+            // find the grandparent_id in tree sturcture
+            var parent_node = $('#root')
+            var parent_id = "#seq_root"
+
+            if(chart_datas[curr_dataset]["a_chart_"+chart_id_index.toString()].hasOwnProperty("parent_chart_id")){
+                // if not first chart
+                var par_id = "#"+chart_datas[curr_dataset]["a_chart_"+chart_id_index.toString()].parent_chart_id
+                Object.keys(tree_structure).forEach(function(grandParent){
+                    if(tree_structure[grandParent].includes(par_id)){
+                        parent_id = grandParent
+                        parent_node =  $('#node_'+ grandParent.substring(9))
+                        
+                    }
+                })
+                if(parent_id != "#seq_root"){
+                    var idx = tree_structure[parent_id].indexOf(par_id)
+                    tree_structure[parent_id].splice(idx+1,0,child_id) 
+                }
+            }
+        }
+
+
+        
+        tree_structure[child_id] = []
+        /*else{
+             tree_structure[child_id] = []
+        }*/
+ 
+    }else{
+        var parent_node = $('#root')
+        var parent_id = "#seq_root"
+        tree_structure[child_id]=[] // child node 
+        tree_structures[curr_dataset][curr_sheet_num-1]=tree_structure
+    }   
+    
+    // add new Node
     var parent_info = parent_node.data('treenode');
     var node_id = "node_"+chart_id_index
-    //new node infp
     var new_node_info = { 
         HTMLclass: "the-parent", 
         HTMLid: node_id
     };
     explore_views[curr_sheet_num-1].tree.addNode(parent_info, new_node_info);
     parent_info.collapsed=false
+    
     //change color
     $('#'+node_id).css({'background-color':node_selected_color});
     $('#'+node_id).addClass("selected")
-
-    
-    child_id = '#a_chart_'+chart_id_index
-    
-    if(parent_id != "#seq_root"){
-        if(Object.keys(tree_structure).length!=0){
-            tree_structure[parent_id].push(child_id)
-        }else{
-            tree_structure[parent_id] = [child_id]
-        }
-    }
-    
-    tree_structure[child_id]=[] // child node 
-    tree_structures[curr_dataset][curr_sheet_num-1]=tree_structure
 
     //check if the node is selected. only show the node which is selected
     updateSeqViewByExloreView()
@@ -131,13 +160,70 @@ function updateSeqViewByExloreView(new_tree_structure = false){
     // 2.draw tree in sequence view
 
     // recreate the tree_structure to split the "comparison" chart
-    var updated_tree_structure = {}
+    //var updated_tree_structure = new_tree_structure
+    new_tree_structure["root"] = []
+
     var drill_tree_structure = {}
     var comparison_tree_structure = {}
-    if(Object.keys(new_tree_structure).length>0){
-        updated_tree_structure = {root:[Object.keys(new_tree_structure)[0]]}
-        
 
+    // root child
+    Object.keys(new_tree_structure).forEach(function(child_id){
+        if(child_id!= "root"){
+            isRoot = true
+
+            Object.keys(new_tree_structure).forEach(function(par_id){
+                if(isRoot && par_id!="root" && child_id!="root" && new_tree_structure[par_id].includes(child_id)){
+                    isRoot = false
+                }
+            }) 
+            if(isRoot) new_tree_structure["root"].push(child_id)
+        }
+        
+    })
+    
+
+
+    if(Object.keys(new_tree_structure).length>0){
+        Object.keys(new_tree_structure).forEach(function(child_id,index){
+            // create drill down tree_structure, for drawing connectors
+            if(index!=0 && child_id!="root"){
+                var chart = chart_datas[curr_dataset][child_id.substring(1)]
+                var parent_id = "#"+chart.parent_chart_id
+                
+                if(chart.expandType == "1"){
+                    if(!drill_tree_structure.hasOwnProperty(parent_id)){
+                        drill_tree_structure[parent_id] = []
+                    }
+                    drill_tree_structure[parent_id].push(child_id)
+                    drill_tree_structure[child_id] = []
+
+                }else if (chart.expandType == "2"){
+                    if(!comparison_tree_structure.hasOwnProperty(parent_id)){
+                        comparison_tree_structure[parent_id] = []
+                    }
+                    comparison_tree_structure[parent_id].push(child_id)
+                    comparison_tree_structure[child_id] = []
+                }
+            }
+        })
+    }
+
+    // create comparison tree structure , for drawing connectors
+    temp = {}
+    Object.keys(comparison_tree_structure).forEach(function(parent_id){
+        array = [parent_id].concat(comparison_tree_structure[parent_id])
+        array.forEach(function(id,i){
+            if(i+1<array.length){
+                temp[id] = [array[i+1]]    
+            }
+        })
+    })
+    comparison_tree_structure = temp
+
+/*
+    if(Object.keys(new_tree_structure).length>0){
+        updated_tree_structure = {root:Object.keys(new_tree_structure)}
+    
         Object.keys(new_tree_structure).forEach(function(parent_id){
             var children = new_tree_structure[parent_id].filter(function(child_id){
                 if (chart_datas[curr_dataset][child_id.substring(1)].expandType == "1"){
@@ -156,14 +242,15 @@ function updateSeqViewByExloreView(new_tree_structure = false){
             // create drill down tree_structure, for drawing connectors
             drill_tree_structure[parent_id] = $.extend(true, [], children);
         })
-
+*/
+/*
         // insert the comparison chart to the parent 
         Object.keys(comparison_tree_structure).forEach(function(parent_id){
             if(chart_datas[curr_dataset][parent_id.substring(1)].expandType!="2"){
                 grand_parent_chart_id = chart_datas[curr_dataset][parent_id.substring(1)].parent_chart_id
                 
             }else{
-                //find grand_parent of the not drill down parent
+                //find grand_parent if the parent is not a drill down chart
                 isComparison = false
                 par_id = parent_id.substring(1)
                 while(!isComparison && par_id){   
@@ -181,23 +268,13 @@ function updateSeqViewByExloreView(new_tree_structure = false){
             parent_id_index = updated_tree_structure[grand_parent_chart_id].indexOf(parent_id)
             updated_tree_structure[grand_parent_chart_id].splice(parent_id_index+1,0,...children_id)    
             
-        })
+        })*/
 
-        // create comparison tree structure , for drawing connectors
-        temp = {}
-        Object.keys(comparison_tree_structure).forEach(function(parent_id){
-            array = [parent_id].concat(comparison_tree_structure[parent_id])
-            array.forEach(function(id,i){
-                if(i+1<array.length){
-                    temp[id] = [array[i+1]]    
-                }
-            })
-        })
-        comparison_tree_structure = temp
-    }
+    //}
     
     seq_data={}
-    seq_data.data=updated_tree_structure
+    seq_data.data=new_tree_structure
+    
 
     $.ajax({
         type: 'POST',
@@ -238,12 +315,13 @@ function updateSeqViewByExloreView(new_tree_structure = false){
 
         // Add element(card) and draw canvas
         for(let i=0;i<chart_id_list.length;i++){
-            let chart_id = chart_id_list[i].substring(1)
-            var chart_div = document.getElementById(chart_id+'-clone')
-            var canvas_id =  "seq_chart_".concat(chart_id.substring(8))
-            var chart_data = chart_datas[curr_dataset][chart_id]
-            addElement(chart_div,canvas_id,chart_data,chart_id)
-            
+            if(chart_id_list[i]!="root"){
+                let chart_id = chart_id_list[i].substring(1)
+                var chart_div = document.getElementById(chart_id+'-clone')
+                var canvas_id =  "seq_chart_".concat(chart_id.substring(8))
+                var chart_data = chart_datas[curr_dataset][chart_id]
+                addElement(chart_div,canvas_id,chart_data,chart_id)
+            }
         }
 
         // Draw connectors
@@ -257,15 +335,6 @@ function updateSeqViewByExloreView(new_tree_structure = false){
                 block.style.borderRadius = block_radius
             }else{
                 cleanRecCanvas()
-            }
-        }
-
-        //move the explore view
-        if(main_chart_id){
-            var explore_view = document.getElementById("explore_view_"+curr_sheet_num)
-            var seq_view = document.getElementById(main_chart_id+'-clone')
-            if(seq_view){
-                explore_view.style.top = seq_view.style.top
             }
         }
 
@@ -400,6 +469,38 @@ function drawChart(chart_data,canvas_id,chart_id=""){
 
     // create chart data 
     chart_type = chart_data.type
+
+    if(curr_dataset=="COVID"){
+        if(Object.getOwnPropertyNames(chart_data.filters).length!=0){
+            if(chart_data.filters["Country/Region"].includes("Italy")){
+                var idx = chart_data.labels.indexOf("05/14")
+                chart_data.datas[0].data[idx] = 899
+            }
+            if(chart_data.filters["Country/Region"].includes("India")){
+                var idx = chart_data.labels.indexOf("06/10")
+                chart_data.datas[0].data[idx] = 9985
+    
+                var idx = chart_data.labels.indexOf("06/11")
+                chart_data.datas[0].data[idx] = 11586
+    
+                var idx = chart_data.labels.indexOf("06/12")
+                chart_data.datas[0].data[idx] = 11567
+    
+                var idx = chart_data.labels.indexOf("06/15")
+                chart_data.datas[0].data[idx] = 11589
+    
+                var idx = chart_data.labels.indexOf("07/28")
+                chart_data.datas[0].data[idx] = 49981
+    
+                var idx = chart_data.labels.indexOf("07/29")
+                chart_data.datas[0].data[idx] = 49982
+            }
+        }
+
+    }
+    
+    
+
     if(chart_type == "bar"){
         options = bar_options(element,chart_data,canvas_id,chart_id,chart_datas)
         datasets = bar_datasets(chart_data,chart_datas)
@@ -466,7 +567,7 @@ function drawConnectors(drill_tree_structure,comparison_tree_structure){
     
     // get node position
     var chart_id_list = Object.keys(drill_tree_structure)
-    var seq_view_id = "seq_view_" + curr_sheet_num
+    seq_view_id = seq_view_id.substring(1)
     svg_block = document.getElementById(seq_view_id).children[0].getBoundingClientRect()
     chart_id_list.forEach(function(chart_id,i){
         id = chart_id.substring(1).concat("-clone")
@@ -1211,9 +1312,12 @@ function updateTrainingData(){
 
 // Exploration(navigation) view
 function addExploreView(){
+
+    addExploreViewElement(curr_sheet_num)
+
     var explore_tree_structure = {
         chart: {
-            container: "#explore_view_"+curr_sheet_num, // div id
+            container: "#explore_view_"+curr_sheet_num.toString(), // div id
             callback : {
                 onAfterAddNode: nodeEvent,
                 onTreeLoaded :nodeEvent
@@ -1231,7 +1335,9 @@ function addExploreView(){
             connectors: {
                 type: "curve",
                 style: {
-                    "stroke-width": 11,
+                    "stroke-width": 2,
+                    "stroke-linecap": "round",
+                    "stroke": "#ccc"
                 }
             },
         },
