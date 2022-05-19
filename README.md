@@ -8,7 +8,7 @@ check [paper](https://dl.acm.org/doi/abs/10.1145/3491102.3517648) for details
 ## User Interface  [(DEMO VIDEO)](https://drive.google.com/file/d/1l28CLZgooxq0PeRy9tMNBYdWOQl_s5R9/view?usp=sharing)
 
 <p align="center">
-  <img src="./img/interface.png" width="80%" height="80%">
+  <img src="./img/interface.png">
 </p>
 
 ### (1)Tree View 
@@ -22,7 +22,7 @@ Supports users to create multiple visualization trees by adding a new sheet. Use
 
 ## System Overview
 <p align="center">
-<img src="https://user-images.githubusercontent.com/28348725/169225796-d93b642a-3d16-4315-9606-3ee0938a69d2.png" width="80%" height="80%">
+<img src="https://user-images.githubusercontent.com/28348725/169225796-d93b642a-3d16-4315-9606-3ee0938a69d2.png">
 </p>
 
 **User interface** allows users to explore the data and show their further exploration intentions by clicking on their interested data points in charts. The selected charts are arranged in a **Tree like structure**, with which the user can intuitively examine patterns among charts.
@@ -44,7 +44,7 @@ VisGuide applies **Drill-down** and **Comparison** operations to the user-focuse
 VisGuide's user preference model is a linear regression model of chart features that is trained online during a user's interaction processes and transferred when the user explores a new dataset. We map each chart to features and the preference score as label (which the preference score is obtain by the users' interaction with the system)
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/28348725/169253424-8964d3b3-aa10-4da2-9576-7cef49de71fa.png" width="80%" height="80%">
+<img src="https://user-images.githubusercontent.com/28348725/169253424-8964d3b3-aa10-4da2-9576-7cef49de71fa.png" >
 </p>
 
 
@@ -101,7 +101,7 @@ We conduct a qualitative experiment by designing the questionnaire that comprise
 The participants gave positive ratings to all aspects of VisGuide. 
 
 <p align="center">
-  <img src="./img/Rating.png" width="80%" height="80%">
+  <img src="./img/Rating.png">
 </p>
 
 **Study 2**
