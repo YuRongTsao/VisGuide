@@ -4,6 +4,7 @@
 
 check [paper](https://dl.acm.org/doi/abs/10.1145/3491102.3517648) for details
 
+check [video in CHI2022](https://www.youtube.com/watch?v=sjN5IBd-lVY)
 
 ## User Interface  [(DEMO VIDEO)](https://drive.google.com/file/d/1l28CLZgooxq0PeRy9tMNBYdWOQl_s5R9/view?usp=sharing)
 
