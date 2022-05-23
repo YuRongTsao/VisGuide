@@ -126,7 +126,7 @@ To evaluate the performance of our transfer mechanism, we compared the first fou
 
 ## How to launch VisGuide
 ### Step1: Launch the server 
-Run `server.ipynb` with jupyter notebook
+Run `server.py` with jupyter notebook
 * The server is launched if you see the following information
 ![](https://i.imgur.com/4sSBjtL.png)
 
