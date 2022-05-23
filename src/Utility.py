@@ -1,88 +1,43 @@
-import InsightFinding
-from ToolFunc import columnEncoding,save_data,read_data
-import ToolFunc as tool
-
-import pickle
 from itertools import chain
 import math
 import operator
 import numpy as np
-import random
-
-from scipy.stats import pearsonr
 from scipy.spatial.distance import jensenshannon
 from scipy.spatial.distance import euclidean
-
 from sklearn import linear_model
-from sklearn.preprocessing import OneHotEncoder
+from scipy import stats
 
+import database_interface
 
-def getPrevis(curr_vis,enumerateVizs):
-    if curr_vis.expandType == '2':
-        pass
-    else: 
-        if len(curr_vis.filter)!=0:
-            for vis in enumerateVizs:
-                if len(vis.filter) == 0 and vis.x == curr_vis.x and vis.y == curr_vis.y and vis.z == curr_vis.z:
-                    return vis
-    return None
-
-def edgeValue(rec_cand,regressionModel=None):
-    for curr_vis in rec_cand:
-        setVisFeature(curr_vis) 
-    features = list(map(lambda vis:list(chain(*list(vis.features.values()))),rec_cand)) 
-
-    if regressionModel == None:
-        # same fixed weight to features
-        edgeValues = [sum(feature) for feature in features]
-        return edgeValues
-    else:
-        if len(list(regressionModel.coef_)) != len(features[0]): 
-            weights = list(regressionModel.coef_)[:6]
-            weights.extend([0.1 for i in range(len(features[0])-6)])
-            edgeValues = [sum(map(operator.mul,weights,feature)) for feature in features]
-        else:
-            edgeValues = regressionModel.predict(features)
-        return edgeValues
-    
-def default_selected_insight(curr_vis):
-    for insight in curr_vis.insights:
-            if insight['insightType']=='max':
-                return insight
-                
-
+########################################### 
+############# vis features ################
+###########################################
 def setVisFeature(curr_vis,isRoot=False):
     if isRoot:
-        curr_vis.features['IS'] = [insightSig(curr_vis)]    
-        curr_vis.features['IG'] = [0]
-        curr_vis.features['expandType'] = [0,0,0]
-        curr_vis.features['expandConsis'] = [0]
-        curr_vis.features['X_encodingType'] = encodingType(curr_vis,curr_vis.par_vis,'x')
-        curr_vis.features['Y_encodingType'] = encodingType(curr_vis,curr_vis.par_vis,'y')
+        curr_vis["features"]['IS'] = [insightSig(curr_vis)]    
+        curr_vis["features"]['IG'] = [0]
+        curr_vis["features"]['expandType'] = [0,0,0]
+        curr_vis["features"]['expandConsis'] = [0]
+        curr_vis["features"]['X_encodingType'] = encodingType(curr_vis,curr_vis["par_vis"],'x')
+        curr_vis["features"]['Y_encodingType'] = encodingType(curr_vis,curr_vis["par_vis"],'y')
     else:
+        curr_vis["features"]['IS'] = [insightSig(curr_vis)]    
+        curr_vis["features"]['IG'] = [infoGain(curr_vis,curr_vis["pre_vis"])]
+        curr_vis["features"]['expandType'] = expandType(curr_vis,curr_vis["par_vis"])
+        curr_vis["features"]['expandConsis'] = [expandConsis(curr_vis)]
+        curr_vis["features"]['X_encodingType'] = encodingType(curr_vis,curr_vis["par_vis"],'x')
+        curr_vis["features"]['Y_encodingType'] = encodingType(curr_vis,curr_vis["par_vis"],'y')
+        curr_vis["euclidean"] = Euclidean(curr_vis,curr_vis["pre_vis"])
 
-        curr_vis.features['IS'] = [insightSig(curr_vis)]    
-        curr_vis.features['IG'] = [infoGain(curr_vis,curr_vis.pre_vis)]
-        curr_vis.features['expandType'] = expandType(curr_vis,curr_vis.par_vis)
-        curr_vis.features['expandConsis'] = [expandConsis(curr_vis)]
-        curr_vis.features['X_encodingType'] = encodingType(curr_vis,curr_vis.par_vis,'x')
-        curr_vis.features['Y_encodingType'] = encodingType(curr_vis,curr_vis.par_vis,'y')
-        curr_vis.euclidean = Euclidean(curr_vis,curr_vis.pre_vis)
-
-
-########## chart feature #############
 def insightSig(curr_vis):
-    sigs = [insight['sig'] for insight in curr_vis.insights]
+    sigs = [insight['sig'] for insight in curr_vis["insights"]]
     return 1-min(sigs)
 
 def infoGain(curr_vis,pre_vis):
     ### KL divergence , 越大越好
     try:
-        curr_subgroup = curr_vis.subgroup
-        pre_subgroup = pre_vis.subgroup
-
-        curr_values = list(curr_subgroup.values())
-        pre_values = [pre_subgroup[key] for key in curr_subgroup.keys()]
+        curr_values = curr_vis["subgroup"].values()
+        pre_values = pre_vis["subgroup"].values()
 
         dist = jensenshannon(curr_values, pre_values ,2) # do normalize to the distribution # bound (0,1)
     except:
@@ -90,104 +45,108 @@ def infoGain(curr_vis,pre_vis):
     return dist
 
 def expandType(curr_vis,par_vis):
-    
-    dataInfos = tool.dataInfos
-    curr_data = tool.curr_data 
-    hierarchy = dataInfos[curr_data]['hierarchy']
-    expand2Type = dataInfos[curr_data]['expand2Type']
+    curr_data = curr_vis["dataName"] 
+    hierarchy = database_interface.get_dataset_hierarachy(curr_data)
+    expand2type = database_interface.get_dataset_expand2type(curr_data)
 
-    if curr_vis.expandType=='1':  # drill down 
+    if curr_vis["expandType"]=='1':  # drill down 
         try:
-            curr_expand_type = hierarchy[curr_vis.x][par_vis.x] 
+            curr_expand_type = hierarchy[curr_vis["x"]][par_vis["x"]] 
         except:
             curr_expand_type = ''
         
-        return expand2Type[curr_expand_type]
-    elif curr_vis.expandType=='2':  #comparison
-        return expand2Type['comparison']
+        return expand2type[curr_expand_type]
+    elif curr_vis["expandType"]=='2':  #comparison
+        return expand2type['comparison']
     else:
-        return expand2Type['']
+        return expand2type['']
  
 
 def expandConsis(curr_vis):
-    curr_expand_type = curr_vis.features['expandType']
+    curr_expand_type = curr_vis["features"]['expandType']
     has_par = True
     totalEdges = 0
     match = 0
     
     while(has_par):
-        if curr_vis.par_vis != None:
-            #print("consis par.y: ",curr_vis.par_vis.y)
-            if curr_vis.par_vis.features['expandType'] == curr_expand_type:
+        if curr_vis["par_vis"] != None:
+            if curr_vis["par_vis"]["features"]['expandType'] == curr_expand_type:
                 match+=1       
             totalEdges += 1 
-            curr_vis = curr_vis.par_vis
+            curr_vis = curr_vis["par_vis"]
         else:
             has_par = False
 
     return match / totalEdges if totalEdges !=0 else 1
 
 def encodingType(curr_vis,par_vis,channel):
-    dataInfos = tool.dataInfos
-    curr_data = tool.curr_data
-
-    encoding2Type = dataInfos[curr_data]['encoding2Type']
-
+    
+    encoding2type = database_interface.get_dataset_encoding2type(curr_vis["dataName"])
     if par_vis == None:
-        return encoding2Type['']
+        return encoding2type['']
     else:
         if channel=='x':
-            return encoding2Type[par_vis.x][curr_vis.x]  
+            return encoding2type[str(par_vis["x"]+curr_vis["x"])]  
         else:
-            return encoding2Type[par_vis.y][curr_vis.y]  
+            return encoding2type[str(par_vis["y"]+curr_vis["y"])]  
 
 def Euclidean(curr_vis,pre_vis):
-    ### euclidean
     try:
-        curr_subgroup = curr_vis.subgroup
-        pre_subgroup = pre_vis.subgroup
-
-        curr_values = list(curr_subgroup.values())
-        pre_values = [pre_subgroup[key] for key in curr_subgroup.keys()]
-
+        curr_values = curr_vis["subgroup"].values()
+        pre_values = pre_vis["subgroup"].values()
         dist = euclidean(np.array(curr_values),np.array(pre_values))
-       
     except:
         return 0.0
     return dist
-    
-def contentImportance(curr_vis,pre_vis): #correlation #改成3col 也可以算的
-    #算兩個Vis的分布相似程度
-    
-    curr_subgroup = curr_vis.subgroup
-    pre_subgroup = pre_vis.subgroup
 
-    curr_values = list(curr_subgroup.values())
-    pre_values = [pre_subgroup[key] for key in curr_subgroup.keys() if key in pre_subgroup]
+
+
+def update_train_data(label_data,curr_data,user_name,train_x=None,train_y=None):
     
-    
-    if len(curr_values) == len(pre_values):
-        G = sum(curr_values)
-        curr_pd = list(map(lambda x : x/G if G!=0 else 0,curr_values)) #normalize to 0-1
+    if train_x==None: 
+        # get old train data
+        train_x,train_y = database_interface.get_user_train_data(user_name)
         
-        G = sum(pre_values)
-        pre_pd = list(map(lambda x : x/G if G!=0 else 0,pre_values))
-
-        corr, p_value = pearsonr(curr_pd, pre_pd)
-        dist = 1-abs(corr)
+        #extend new train data
+        visLabeled = [database_interface.get_vis_by_index(curr_data,int(idx)) for idx in label_data.keys()]        
+        train_x.extend(list(map(lambda vis : list(chain(*list(vis["features"].values()))),visLabeled)))
+        train_y.append(list(map(lambda y:float(y),list(label_data.values()))))
         
-    else:
-        dist = 1.0
+    # udpate to db
+    database_interface.update_user_train_data(user_name,train_x,train_y)
     
-    return dist 
-
-def one_hot_encoding(train_X): #train_X : list 
-    X =  np.reshape(train_X, (len(train_X), len(train_X[0])))
+    print("update training data, num of records = " + str(len(train_x)))
     
-    onehotencoder = OneHotEncoder(categorical_features = [3,4])
-    ohe_X = onehotencoder.fit_transform(X).toarray()
-    return ohe_X
+    return train_x,train_y
 
+
+
+
+###########################################     
+############# label management ############
+###########################################
+def getDecayingLabel(train_y):
+    #train_y = [[],[],[]...]
+    #只留前5個
+    duration = 5 
+    decay_rate = 0.9
+    threshold = len(train_y) - duration
+    result = []
+
+    for i,labels in enumerate(train_y):
+        diff = i-threshold
+        if diff<0:
+            result.extend(list(map(lambda label:label * math.pow(decay_rate,abs(diff)),labels)))
+        else:
+            result.extend(labels)
+    return result
+
+
+
+
+###########################################
+############ model training ###############
+###########################################
 def trainRegression(train_X,train_y,model,init_model_option):
     X =  np.reshape(train_X, (len(train_X), len(train_X[0])))
     y = np.array(train_y)
@@ -201,8 +160,8 @@ def trainRegression(train_X,train_y,model,init_model_option):
         regressionModel = linear_model.SGDRegressor(max_iter=1000, tol=1e-3,warm_start=True).fit(X, y)
         init_model_option = ""
 
-        # transfer first 5 features        
-        pre_weight_len = 4
+        # transfer first 4 features (len==6)
+        pre_weight_len = 6
         coef_old = list(model.coef_)
         coef_new = list(regressionModel.coef_)
         coef = coef_old [:pre_weight_len]
@@ -220,39 +179,28 @@ def trainRegression(train_X,train_y,model,init_model_option):
     return regressionModel,init_model_option
 
 
-def getDecayingLabel(train_y):
-    #train_y = [[],[],[]...]
-    #只留前5個
-    duration = 5 
-    decay_rate = 0.9
-    threshold = len(train_y) - duration
-    result = []
+###########################################
+############ prediction ###################
+###########################################
 
-    for i,labels in enumerate(train_y):
-        diff = i-threshold
-        if diff<0:
-            result.extend(list(map(lambda label:label * math.pow(decay_rate,abs(diff)),labels)))
+def edgeValue(rec_cand,regressionModel=None):
+    for curr_vis in rec_cand:
+        setVisFeature(curr_vis) 
+    features = list(map(lambda vis:list(chain(*list(vis["features"].values()))),rec_cand)) 
+
+    if regressionModel == None:
+        # same fixed weight to features
+        edgeValues = [sum(feature) for feature in features]
+        return edgeValues
+    else:
+        # transfer model
+        if len(list(regressionModel.coef_)) != len(features[0]): 
+            weights = list(regressionModel.coef_)[:6]
+            weights.extend([0.1 for i in range(len(features[0])-6)])
+            edgeValues = [sum(map(operator.mul,weights,feature)) for feature in features]
+        # model exist and predict
         else:
-            result.extend(labels)
-    return result
-
-def getUserSelectedInsight(vis,insight_key): 
-    for insight in vis.insights:
-        if str(insight['key']) == str(insight_key):
-            return insight
-    return None
-    
-def getAllParVis(curr_vis):
-    result = [curr_vis]
-    has_par = True
-
-    while(has_par):
-        if curr_vis.par_vis and curr_vis.par_vis!=None:
-            result.insert(0,curr_vis.par_vis)       
-            curr_vis = curr_vis.par_vis
-        else:
-            has_par = False
-
-    return result
+            edgeValues = regressionModel.predict(features)
+        return edgeValues
 
 
