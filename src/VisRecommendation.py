@@ -1,138 +1,139 @@
 import Utility
-import ToolFunc as tool
 import InsightFinding
-import time
-import numpy as np
-import random
-from collections import defaultdict
+import database_interface
+import dataform_helper
 
-def getNonduplicateVis(rec_cand):
-    deleteVis = []
-
-    for i in range(len(rec_cand)):  #TODO 變成tuple減少for迴圈
-        for j in range(i+1,len(rec_cand)):
-            if rec_cand[i] not in deleteVis and rec_cand[j] not in deleteVis and rec_cand[i].x == rec_cand[j].x and rec_cand[i].y == rec_cand[j].y:
-                if Utility.contentImportance(rec_cand[i],rec_cand[j]) <= 0.1:  
-                    if rec_cand[i].edgeValue >= rec_cand[j].edgeValue:
-                        #del rec_cand[j]
-                        deleteVis.append(rec_cand[j])
-                    else:
-                        #del rec_cand[i]
-                        deleteVis.append(rec_cand[i])
-                    #getNonduplicateVis(rec_cand)
-                    break
-    nonDupCand = [vis for vis in rec_cand if vis not in deleteVis]
-    return nonDupCand
-
-def getExpandVizs(par_vizs,userSelectedInsight,enumerateVizs,tree_vizs):
-
-    type1_candVizs = [] #放要推薦的候選人，才不會多加到enumerateVizs
-    type2_candVizs = []
-    expendVizs = [] #新的先放這裡原本的enumerateVizs才不會一直變多
-    par_vis = par_vizs[-1]
-    if userSelectedInsight == '':
-        userSelectedInsight = Utility.default_selected_insight(par_vis)
-
-
-    for i,vis in enumerate(enumerateVizs):
-        if vis not in par_vizs: #如果目前的filter是一樣的才要額外加新的filter
-            #if (par_vis.x == par_vis.y and (vis.x!=par_vis.x and vis.y!=par_vis.y)) or (vis.x!=par_vis.x and vis.y==par_vis.y): # 1.pie 2.x,y不同
-            if (par_vis.x == par_vis.y and (vis.x!=par_vis.x and vis.y=="invoice_price")) or (vis.x!=par_vis.x and vis.y==par_vis.y): # 1.pie 2.x,y不同
-                    # type 1 expand
-                    temp = tool.getCopyVis(vis,False)
-                    temp.filter = defaultdict(list)
-                    for key,value in par_vis.filter.items(): 
-                        temp.filter[key] = value
-                    temp.filter[par_vis.x].append(userSelectedInsight['key'])    
+def set_exist_vis(vis,expandType,dataName,clicked_vis_idx,insightType):
+    vis["expandType"] = expandType
+    vis["par_vis"] = database_interface.get_vis_by_index(dataName,clicked_vis_idx)
+    vis["insightType"] = insightType
+    
+    Utility.setVisFeature(vis,vis["is_root_vis"])  
                     
+    # update to db
+    database_interface.update_document(dataName,vis)
+    
+    return vis
 
-                    if temp not in type1_candVizs: # 不能跟已有的推薦一樣
-                        same_vis,_ = tool.hasSameVis(temp,enumerateVizs)
-                        
-                        if same_vis==None:
-                            temp.par_vis = par_vis
-                            temp.pre_vis = Utility.getPrevis(temp,enumerateVizs)
-                            temp.insightType = userSelectedInsight['insightType']
-                            temp.expandType = '1'
 
-                            temp.setVisInfo()
-                            temp.insights = InsightFinding.findExtreme(temp)
-                            if temp.insights == None:
-                                continue
-                            temp.insights.extend(InsightFinding.findDifDistribution(temp,temp.pre_vis))
-
-                            expendVizs.append(temp)
-                            type1_candVizs.append(temp)
-                        else:
-                            same_vis.expandType = "1"
-                            same_vis.par_vis = par_vis
-                            same_vis.insightType = userSelectedInsight['insightType']
-                            type1_candVizs.append(same_vis)
-   
-            elif vis.x==par_vis.x and vis.y!=par_vis.y: #expand type = 2
-                temp = tool.getCopyVis(vis,False)
-                temp.filter = par_vis.filter        
+def set_new_vis(vis,expandType,dataName,clicked_vis_idx,insightType,new_vis_idx):
+    vis["subgroup"],vis["max_key"],vis["min_key"] = dataform_helper.getGroup(vis)
+    vis["insights"] = InsightFinding.findExtreme(vis)
+    vis["pre_vis"] = database_interface.get_vis_by_axis(dataName,vis["x"],vis["y"])
+    vis["insights"].extend(InsightFinding.findDifDistribution(vis,vis["pre_vis"]))
+    vis["is_root_vis"] = False
+    vis["index"] = new_vis_idx
                 
-                if temp not in type2_candVizs + par_vizs + tree_vizs: # 不能跟已有的推薦一樣
-                    same_vis,_ = tool.hasSameVis(temp,enumerateVizs)
-                    if same_vis==None:
-                        temp.par_vis = par_vis
-                        temp.pre_vis = Utility.getPrevis(temp,enumerateVizs)
-                        temp.insightType = userSelectedInsight['insightType']
-                        temp.expandType = '2'
+    # set vis features (relate to exploration order)
+    vis["par_vis"] = database_interface.get_vis_by_index(dataName,clicked_vis_idx)
+    vis["insightType"] = insightType
+    vis["expandType"] = expandType
+    Utility.setVisFeature(vis,vis["is_root_vis"])  
+                
+    # push in db (only data)
+    del vis['_id']
+    database_interface.insert_new_vis(dataName,vis)
+                
+    return vis
 
-                        temp.setVisInfo()
-                        temp.insights = InsightFinding.findExtreme(temp)
-                        if temp.insights == None:
-                            continue
-                        temp.insights.extend(InsightFinding.findDifDistribution(temp,temp.pre_vis))
-                            
-                            
-                        expendVizs.append(temp)
-                        type2_candVizs.append(temp)
-                    else:
-                        same_vis.expandType = '2'
-                        #pre_vis = Utility.getPrevis(same_vis,enumerateVizs)
-                        if(not same_vis.pre_vis):
-                            #same_vis.pre_vis = pre_vis if pre_vis!= None else par_vis
-                            same_vis.pre_vis = par_vis
-                        same_vis.par_vis = par_vis
-                                
-                        type2_candVizs.append(same_vis)      
 
-    enumerateVizs.extend(expendVizs)  
+def getExpandVizs(dataName,clicked_vis,userSelectedInsight,tree_vizs):
 
-    return type1_candVizs,type2_candVizs
+    # get the candidates based on the expend rule
+    if clicked_vis["y_aggre"] == "cnt": 
+        type1_candVizs = database_interface.get_visz_by_query(dataName,{"x":{"$ne" : clicked_vis["x"]},
+                                                                        "filter":clicked_vis["filter"]}) #diff x, no limit y, the same filter
+    else:
+        
+        type1_candVizs = database_interface.get_visz_by_query(dataName,{"x":{"$ne" : clicked_vis["x"]},
+                                                                        "y":clicked_vis["y"],
+                                                                        "filter":clicked_vis["filter"]}) #diff x, same y
+        
+    type2_filter = clicked_vis["filter"] if clicked_vis["filter"]=={} else {"$ne":clicked_vis["filter"]}
+    type2_candVizs = database_interface.get_visz_by_query(dataName,{"x":clicked_vis["x"],
+                                                                    "y":{"$ne":clicked_vis["y"]},
+                                                                    "filter":type2_filter}) #diff y, same x
+        
+    
+    
+    
+    type1_results=[]
+    type2_results=[]
+    
+    if userSelectedInsight == '':
+        userSelectedInsight = dataform_helper.default_selected_insight(clicked_vis)
+
+    new_vis_idx = database_interface.get_db_vis_idx(dataName)
+
+    # type 1 expand
+    for vis in type1_candVizs:
+        # add new filter 
+        vis["filter"][clicked_vis["x"]]=userSelectedInsight['key']
+                  
+        # check if the vis is alrealy in the db  
+        same_vis = database_interface.get_vis_by_axis(dataName,vis["x"],vis["y"],vis["filter"])
+            
+        if same_vis and same_vis["index"] not in tree_vizs:
+            # set the same vis
+            same_vis = set_exist_vis(same_vis,"1",dataName,clicked_vis["index"],userSelectedInsight['insightType'])
+            type1_results.append(same_vis)
+
+        else:
+            # set new vis
+            vis = set_new_vis(vis,"1",dataName,clicked_vis["index"],userSelectedInsight['insightType'],new_vis_idx)
+            new_vis_idx+=1
+            type1_results.append(vis)
+            
+            
+    # type 2 expand 
+    for vis in type2_candVizs:
+        # check if the vis is alrealy in the db  
+        vis["filter"] = clicked_vis["filter"]
+        same_vis = database_interface.get_vis_by_axis(dataName,vis["x"],vis["y"],vis["filter"])
+        
+        
+        if same_vis:
+            # set the same vis
+            type2_results_idx = [int(vis["index"]) for vis in type2_results]
+            if same_vis["index"] not in tree_vizs and same_vis["index"] not in type2_results_idx:
+                same_vis = set_exist_vis(same_vis,"2",dataName,clicked_vis["index"],userSelectedInsight['insightType'])
+                type2_results.append(same_vis)
+                
+        else:
+            # set new vis
+            vis = set_new_vis(vis,"2",dataName,clicked_vis["index"],userSelectedInsight['insightType'],new_vis_idx)
+            new_vis_idx+=1
+            type2_results.append(vis)
+            
+        
+    return type1_results,type2_results
 
  
-def getVisRec(par_vizs,userSelectedInsight,enumerateVizs,regressionModel=None,tree_vizs=[]): #return top 10 recommendation []
-   
-    start=time.time()
+def getVisRec(dataName,clicked_vis,userSelectedInsight,regressionModel=None,tree_vizs=[]): #return top 10 recommendation []
     
-    type1_rec_cand,type2_rec_cand =  getExpandVizs(par_vizs,userSelectedInsight,enumerateVizs,tree_vizs) 
+    type1_rec_cand,type2_rec_cand =  getExpandVizs(dataName,clicked_vis,userSelectedInsight,tree_vizs) 
 
-    #get type1 edge Values
+    #compute type1 recommendation predictive value(edge values)
     if len(type1_rec_cand)!=0:
         edgeValues = Utility.edgeValue(type1_rec_cand,regressionModel)
         for i,vis in enumerate(type1_rec_cand):
-            vis.edgeValue = edgeValues[i]
+            vis["edgeValue"] = edgeValues[i]
         
-    #get type2 edge Values
+    #compute type1 recommendation predictive value(edge values)
     if len(type2_rec_cand)!=0:
         edgeValues = Utility.edgeValue(type2_rec_cand,regressionModel)
         for i,vis in enumerate(type2_rec_cand):
-            vis.edgeValue = edgeValues[i]
-
-    type1_rec_cand.sort(key = lambda curr_vis:curr_vis.edgeValue,reverse=True)
-    type2_rec_cand.sort(key = lambda curr_vis:curr_vis.edgeValue,reverse=True)
+            vis["edgeValue"] = edgeValues[i]
+    
+    # sorting based on the predictive value, which is the rank of the recommendations 
+    type1_rec_cand.sort(key = lambda curr_vis:curr_vis["edgeValue"],reverse=True)
+    type2_rec_cand.sort(key = lambda curr_vis:curr_vis["edgeValue"],reverse=True)
         
 
-    par_vizs[-1].children['type1'] = type1_rec_cand
-    par_vizs[-1].children['type2'] = type2_rec_cand
+    clicked_vis["children"]['type1'] = type1_rec_cand
+    clicked_vis["children"]['type2'] = type2_rec_cand
 
-    end = time.time()
-    print('getVisRec : ' + str(end-start))
-    return type1_rec_cand,type2_rec_cand
+    return type1_rec_cand,type2_rec_cand,clicked_vis
 
     
        
