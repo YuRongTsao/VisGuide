@@ -760,7 +760,7 @@ function getVisRec(chart_index,click_item,chart_id){
         chart_indices = Object.keys(tree_structures[curr_dataset][curr_sheet_num-1]).map(function(chart_id){
             chart_id = chart_id.substring(1) + "-clone"
             canvas_id = $("#"+chart_id).find("canvas")[0].id
-            return document.getElementById(canvas_id).getAttribute("data-chartIndex")
+            return parseInt(document.getElementById(canvas_id).getAttribute("data-chartIndex"))
         })
 
         //request data
@@ -1459,7 +1459,7 @@ $(document).ready(function(){
 
     // add all dataset options
     $.ajax({
-        type: 'POST',
+        type: 'GET',
         url:"http://127.0.0.1:5000/get_datasets",
         data:JSON.stringify([])
     }).done(function(responce){
