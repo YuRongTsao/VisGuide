@@ -1,118 +1,36 @@
-from flask import Flask,request,flash,jsonify,make_response
+from flask import Flask,request,jsonify
 import json
-import random
 from itertools import chain
-import ToolFunc as tool
 import VisRecommendation
 import Utility
+import database_interface
+import dataform_helper
 
-tool.init() # read data,calculate data informations
-dataInfos = tool.dataInfos
-train_X = []
-train_y = []
+########### handle front/back end attrs #############
 model = None
 init_model_option = "" # scratch, pretrain, transfer, heuristic
 init = True  #是否為新user
-
-#set init vis feature
-for dataName,dataInfo in dataInfos.items():
-    for vis in dataInfo['enumerateVizs']:
-        tool.curr_data = dataName 
-        Utility.setVisFeature(vis,True)
-
-
-def getInitChart(rootVizs,x,y):
-    vis = None
-
-    for vis in rootVizs:
-        if vis.x==x and vis.y==y:
-            vis.par_vis = None
-            return vis                    
-    return None
-
-def getChartData(vis,index=None,rank = 0):
-    global enumerateVizs
-    
-    if not index:
-        _,chart_index = tool.hasSameVis(vis,enumerateVizs)
-    else:
-        chart_index = index
-
-    if vis.x in tool.dataInfos[tool.curr_data]['nominal']:
-        sorted_group = dict(sorted(vis.subgroup.items(),key=lambda x : x[1],reverse=True))
-    else:
-        sorted_group = vis.subgroup
-    values = list(map(lambda value:round(value,2),list(sorted_group.values())))
-    keys = list(sorted_group.keys())
-    label = 'Overall' if len(vis.filter) == 0 else ', '.join([key+':'+','.join(list(map(lambda value:str(value) if value!="" else "none",value))) for key,value in vis.filter.items()])
-    data = {
-        'x':vis.x,
-        'y':vis.y + '(' + vis.y_aggre+')' if vis.y!=vis.x else "percentage of count",
-        'y_glo_aggre':vis.globalAggre,
-        'type':vis.mark,
-        'labels':keys,
-        'datas':[
-            {
-                'data':values,
-                'label':label,      
-            },
-        ],
-        'chart_index': chart_index,
-        'label':0,
-        'rank':rank,
-        'otherInfo':{},
-        'rec':{},
-        'is_selected':False,
-        'insights': {insight["key"]:insight["insightType"] for insight in vis.insights},
-        'filters':vis.filter,           
-        'expandType': vis.expandType,
-        'aggre':vis.y_aggre,
-        'sort':'desc',
-        'multiple_yAxes':False
-
-    }
-    
-    if vis.pre_vis and vis.x == vis.pre_vis.x and vis.y == vis.pre_vis.y:
-        data["multiple_yAxes"] = True
-        data['datas'].append({
-            'data': list(map(lambda value: round(value,2),[vis.pre_vis.subgroup[key] for key in keys])),
-            'label' : 'Overall'            
-        })
-
-    return data
-
-def changeData(dataset_name,get_data=None):
-    global model,dataInfos,train_X,train_y,enumerateVizs,rootVizs
-    # store current model
-
-    #store information
-    if get_data!=None and len(list(get_data.keys()))>3:
-        print('save info')
-        save_data = {key:value for key,value in get_data.items() if key!='dataset_name'}
-        
-        tool.wirteFile(save_data["store_dataset"],save_data)
-
-        print('save curr model:',tool.curr_data)
-        tool.save_data(model,save_data["store_dataset"])
-
-        print('save training data:')
-        tool.save_training_data(train_X,'train_X')
-        tool.save_training_data(train_y,'train_y')
-
-    #reset information
-    tool.curr_data = dataset_name
-    enumerateVizs = dataInfos[tool.curr_data]['enumerateVizs'] # get all column combination of the VisrootVizs = [vis for vis in enumerateVizs if len(vis.filter)==0]    
-    rootVizs = dataInfos[tool.curr_data]['rootVizs']
-    train_X = []
-    train_y = []
-    #cross_init = True
+curr_data =''
+curr_user_name = ''
 
 
 app = Flask(__name__)
 
+### init web ###
+@app.route('/get_datasets',methods=['GET','POST'])
+def get_datasets():
+    if request.method == 'GET':
+        dataset_names = database_interface.get_all_dataset_names()
+        datasets= [{"name":name} for name in dataset_names]
+        
+    rst = jsonify(datasets)   
+    rst.headers.add('Access-Control-Allow-Origin', '*')
+
+    return rst,200
+
 @app.route('/get_options',methods=['GET','POST'])
 def get_options():
-    global enumerateVizs,dataInfos,rootVizs,model,train_X,train_y,init,init_model_option
+    global curr_data,model,init,init_model_option,curr_user_name
     if request.method == 'POST':
         get_data = json.loads(request.get_data())
         dataset_name = get_data['dataset_name']
@@ -120,50 +38,57 @@ def get_options():
         
         if init : 
             # Init model if a new user come
-            tool.curr_data = dataset_name
+            curr_data = dataset_name
             init_model_option = get_data['init_model_option']
 
             if init_model_option == "scratch":
-                print('Model from scratch: ',tool.curr_data)
+                print('Model from scratch: ',curr_data)
                 model = None
 
             elif init_model_option == "pretrain":
-                print("Model from pretrain: " ,tool.curr_data)
-                model = tool.read_data('AQ_pretrain') if tool.curr_data=="AQ"\
-                    else tool.read_data('Transaction_pretrain') if tool.curr_data== "Transaction"\
-                    else None
+                print("Model from pretrain: " ,curr_data)
+                #model = tool.read_data('AQ_pretrain') if curr_data=="AQ"\
+                #    else tool.read_data('Transaction_pretrain') if curr_data== "Transaction"\
+                #    else None
                 
             elif init_model_option == "heuristic":
-                print("Model from heuristic(no model): " ,tool.curr_data)
+                print("Model from heuristic(no model): " ,curr_data)
                 model = None
             
             else:
                 print("Unknown model status")
                 model = None
- 
-            enumerateVizs = dataInfos[tool.curr_data]['enumerateVizs'] # get all column combination of the VisrootVizs = [vis for vis in enumerateVizs if len(vis.filter)==0]    
-            rootVizs = dataInfos[tool.curr_data]['rootVizs']
+
+
+            # create a new user log in db
+            curr_user_name = database_interface.get_user_num()
+            database_interface.create_new_user_log(curr_user_name)
 
             init = False
+            
         
         else:
             # change dataset with the same user
-            if dataset_name!=tool.curr_data or init_model_option == "transfer":
-                print("Model from transfer: " ,tool.curr_data)
+            if dataset_name!=curr_data or init_model_option == "transfer":
+                print("Model from transfer: " ,curr_data)
 
-                # set model option 
+                # set model option
+                curr_data = dataset_name 
                 init_model_option = "transfer"
-                changeData(dataset_name,get_data)
+                database_interface.update_exploration_tree(model,curr_user_name,get_data)
         
 
-        #set column options
-        data_info = tool.dataInfos[dataset_name]
-        data = {}
-        data['x_axis'] = [{'name':column}for column in list(data_info['nominal'])]
-        data['x_axis'].extend([{'name':column}for column in list(data_info['temporal'])])
-        data['y_axis'] = [{'name':column}for column in list(data_info['quantitative'])]
-        data['x_default'] = data_info['x_default']
-        data['y_default'] = data_info['y_default']
+    #set column options
+    data = {}
+        
+    nominal_cols = database_interface.get_dataset_columns(dataset_name,'nominal')
+    temporal_cols = database_interface.get_dataset_columns(dataset_name,'temporal')
+    quan_cols = database_interface.get_dataset_columns(dataset_name,'quantitative')
+    
+    data['x_axis'] = [{'name':column}for column in nominal_cols+temporal_cols]
+    data['y_axis'] = [{'name':column}for column in quan_cols]
+    data['x_default'] = database_interface.get_axis_default(dataset_name,'x')
+    data['y_default'] = database_interface.get_axis_default(dataset_name,'y')
     
     rst = jsonify(data)   
     rst.headers.add('Access-Control-Allow-Origin', '*')
@@ -173,167 +98,34 @@ def get_options():
 
 @app.route('/get_init_chart',methods=['GET','POST'])
 def get_init_chart():
-    global rootVizs
+    global curr_data
     if request.method == 'POST':
-        get_data = json.loads(request.get_data())
-        vis = getInitChart(rootVizs,get_data['x'],get_data['y'])
-        data = getChartData(vis)
-    
-    rst = jsonify(data)   
-    rst.headers.add('Access-Control-Allow-Origin', '*')
-    
-
-    return rst,200
-
-@app.route('/update_tr_data',methods=['GET','POST'])
-def update_tr_data():
-    data = {"update":False}
-
-    if request.method == 'POST':
+        # get client data 
         get_data = json.loads(request.get_data())
         
-        visLabeled = [enumerateVizs[int(key)] for key in get_data['label_data'].keys()]
-        train_X.extend(list(map(lambda vis : list(chain(*list(vis.features.values()))),visLabeled)))
-        train_y.append(list(map(lambda y:float(y),list(get_data['label_data'].values()))))
-        print("update training data, len(x) = " + str(len(train_X)))
-        data["update"] = True
+        # find the same vis in the db
+        vis = database_interface.get_vis_by_axis(curr_data,get_data['x'],get_data['y'])
+        vis["par_vis"] = None
 
-    rst = jsonify(data)   
-    rst.headers.add('Access-Control-Allow-Origin', '*')
-    
-    return rst,200
-
-@app.route('/get_vis_rec',methods=['GET','POST'])
-def get_vis_rec():
-    global enumerateVizs,model,train_X,train_y,init_model_option
-    data = {}
-    
-    if request.method == 'POST':
-        get_data = json.loads(request.get_data())
-        tree_vizs =[enumerateVizs[int(index)] for index in get_data["chart_indices"]]  # vis index of chart in the tree view
-        userSelectedVis = enumerateVizs[int(get_data['chart_index'])]
-        par_vizs = Utility.getAllParVis(userSelectedVis)
-        userSelectedInsight = Utility.getUserSelectedInsight(userSelectedVis,get_data['click_item'])
-
-        if not userSelectedInsight:
-                userSelectedInsight={}
-                userSelectedInsight['insightType'] = 'none',
-                userSelectedInsight['key'] = get_data['click_item']
-        
-        if init_model_option != "heuristic":
-            # no need to train model if the model option == heuristic 
-            # train model based on the label_data
-
-            if init_model_option == "transfer":
-                train_X.extend([list(chain(*list(userSelectedVis.features.values())))])
-                train_y = [[0.0]]
-                decay_labels = [0.0]
-                print('cross init feature length:',len(list(chain(*list(userSelectedVis.features.values())))))
-
-                model,init_model_option = Utility.trainRegression(train_X,decay_labels,model,init_model_option)
-            elif (len(get_data['label_data'])>1):
-                #get training data
-                visLabeled = [enumerateVizs[int(key)] for key in get_data['label_data'].keys()]        
-                train_X.extend(list(map(lambda vis : list(chain(*list(vis.features.values()))),visLabeled)))
-                train_y.append(list(map(lambda y:float(y),list(get_data['label_data'].values()))))
-                decay_labels = Utility.getDecayingLabel(train_y)
-
-                #train model
-                model,init_model_option = Utility.trainRegression(train_X,decay_labels,model,init_model_option)
-            
-        #get rec based on the regression model
-        type1_visRec,type2_visRec = VisRecommendation.getVisRec(par_vizs,userSelectedInsight,enumerateVizs,model,tree_vizs)
-                 
-        data['type1'] = [getChartData(vis,rank=i+1) for i,vis in enumerate(type1_visRec)]
-        data['type2'] = [getChartData(vis,rank=i+1) for i,vis in enumerate(type2_visRec)]
-
-    rst = jsonify(data)   
-    rst.headers.add('Access-Control-Allow-Origin', '*')
-    
-    return rst,200
-
-@app.route('/get_chart_by_index',methods=['GET','POST'])
-def get_chart_by_index():
-    global enumerateVizs
-    if request.method == 'POST':
-        get_data = json.loads(request.get_data())
-        chart_index = int(get_data['chart_index'])
-        data = getChartData(enumerateVizs[chart_index],chart_index)
+        # change the format to client chart.js
+        data = dataform_helper.getChartData(vis)
     
     rst = jsonify(data)   
     rst.headers.add('Access-Control-Allow-Origin', '*')
-
-    return rst,200
-
-@app.route('/get_new_data',methods=['GET','POST'])
-def get_new_data():
-    global enumerateVizs,dataInfos
-    data = {}
-    if request.method == 'POST':
-        get_data = json.loads(request.get_data())
-        chart_index = int(get_data['chart_index'])
-        aggre = get_data['aggre']
-        sort = get_data['sort']
-        vis = enumerateVizs[chart_index]
-
-        # new aggre
-        data["y"] = vis.y + '(' + aggre+')' if vis.y!=vis.x else "percentage of count",
-
-        # new sorted_group
-        data["datas"] = []
-        
-        ### subset
-        subgroup = vis.getSubgroup(aggre) if (vis.x != vis.y) else vis.subgroup
-        
-        # sorted based on the sort option
-        sorted_group = subgroup
-        if vis.x in tool.dataInfos[tool.curr_data]['nominal']:
-            if sort == "desc":
-                sorted_group = dict(sorted(subgroup.items(),key=lambda x : x[1],reverse=True))
-            elif sort == "asc":
-                sorted_group = dict(sorted(subgroup.items(),key=lambda x : x[1]))
-      
-
-        data["datas"].append(list(map(lambda value:round(value,2),list(sorted_group.values()))))
-        
-        # sorted labels
-        labels = list(sorted_group.keys())
-        data["labels"] = labels
-
-        ### overall
-        if vis.pre_vis and vis.x == vis.pre_vis.x and vis.y == vis.pre_vis.y:
-            pre_subgroup = vis.pre_vis.getSubgroup(aggre) if (vis.x != vis.y) else vis.pre_vis.subgroup
-            data["datas"].append(list(map(lambda value: round(value,2),[pre_subgroup[key] for key in labels])))
-            
-        # new insight
     
-    rst = jsonify(data)   
-    rst.headers.add('Access-Control-Allow-Origin', '*')
 
-    return rst,200
-
-
-@app.route('/update_dataset',methods=['GET','POST'])
-def update_dataset():
-    if request.method == 'POST':
-        get_data = json.loads(request.get_data())
-        dataset_name = get_data['dataset_name']
-        changeData(dataset_name)
-    
-    data ={}
-    rst = jsonify(data)   
-    rst.headers.add('Access-Control-Allow-Origin', '*')
     return rst,200
 
 @app.route('/get_seq_data',methods=['GET','POST'])
-def get_seq_data():
+def get_seq_data(): # data structure of the treant(tree structure) lib
     if request.method == 'POST':
         get_data = json.loads(request.get_data())
         data = get_data['data']
 
         if len(data)>0:
             node = {
-                'innerHTML': list(data.keys())[0],
+                #'innerHTML': list(data.keys())[0],
+                'innerHTML': "root",
                 'pseudo': True,
             }
             stacks = [node]
@@ -357,30 +149,112 @@ def get_seq_data():
     rst.headers.add('Access-Control-Allow-Origin', '*')
     return rst,200
 
-@app.route('/change_user',methods=['GET','POST'])
-def change_user():
-    global enumerateVizs,rootVizs,model,train_X,train_y,init
+
+@app.route('/get_vis_rec',methods=['GET','POST'])
+def get_vis_rec():
+    global model,init_model_option
+    data = {}
+    
     if request.method == 'POST':
         get_data = json.loads(request.get_data())
-        dataset = get_data['dataset']
+        tree_vizs = get_data["chart_indices"]  # vis index of chart in the tree view
+        clicked_vis = database_interface.get_vis_by_index(curr_data,int(get_data['chart_index']))
+        userSelectedInsight = dataform_helper.getUserSelectedInsight(clicked_vis,get_data['click_item'])
+
+        if not userSelectedInsight:
+                userSelectedInsight={}
+                userSelectedInsight['insightType'] = 'none',
+                userSelectedInsight['key'] = get_data['click_item']
+        
+        if init_model_option != "heuristic":
+            # no need to train model if the model option == heuristic 
+            # train model based on the label_data
+
+            if init_model_option == "transfer":
+                
+                train_x=[list(chain(*list(clicked_vis["features"].values())))]
+                train_x,train_y = Utility.update_train_data(get_data['label_data'],curr_data,curr_user_name,train_x,[[0.0]])
+                
+                print('cross init feature length:',len(train_x))
+                model,init_model_option = Utility.trainRegression(train_x,train_y,model,init_model_option)
+            
+            elif (len(get_data['label_data'])>1):
+                #get training data
+                train_x,train_y = Utility.update_train_data(get_data['label_data'],curr_data,user_name=curr_user_name)
+                train_y = Utility.getDecayingLabel(train_y)
+
+                #train model
+                model,init_model_option = Utility.trainRegression(train_x,train_y,model,init_model_option)
+            
+        #get rec based on the regression model
+        type1_visRec,type2_visRec, clicked_vis = VisRecommendation.getVisRec(curr_data,clicked_vis,userSelectedInsight,model,tree_vizs)
+                 
+        data['type1'] = [dataform_helper.getChartData(vis,rank=i+1) for i,vis in enumerate(type1_visRec)]
+        data['type2'] = [dataform_helper.getChartData(vis,rank=i+1) for i,vis in enumerate(type2_visRec)]
+
+    rst = jsonify(data)   
+    rst.headers.add('Access-Control-Allow-Origin', '*')
+    
+    return rst,200
+
+@app.route('/get_new_data',methods=['GET','POST'])
+def get_new_data():  # modify aggre and sorting order based on option button in ui
+    data = {}
+    if request.method == 'POST':
+        get_data = json.loads(request.get_data())
+        index = int(get_data['chart_index'])
+        aggre = get_data['aggre']
+        sort = get_data['sort']
+        vis = database_interface.get_vis_by_index(curr_data,index)
+
+        # new sorted_group
+        data["datas"] = []
+        
+        ### get new group based on new aggre
+        subgroup = dataform_helper.group_by_aggre(vis,aggre) if (vis["x"] != vis["y"]) else vis["subgroup"]
+        
+        ### sorted based on the sort option
+        if vis["x"] in database_interface.get_dataset_columns(curr_data,'nominal'):
+            if sort == "desc":
+                subgroup = dict(sorted(subgroup.items(),key=lambda x : x[1],reverse=True))
+            elif sort == "asc":
+                subgroup = dict(sorted(subgroup.items(),key=lambda x : x[1]))
+        data["datas"].append(list(subgroup.values()))
+        
+        
+        ### overall
+        if vis["pre_vis"]:
+            pre_subgroup = dataform_helper.group_by_aggre(vis["pre_vis"],aggre) if (vis["x"] != vis["y"]) else vis["pre_vis"]["subgroup"]
+            data["datas"].append([pre_subgroup[key] for key in list(subgroup.keys())])
+            
+        
+        # new aggre legend
+        data["y"] = vis["y"] + '(' + aggre+')' if vis["y"]!=vis["x"] else "percentage of count",
+        # sorted labels
+        data["labels"] = list(subgroup.keys())
+
+    
+    rst = jsonify(data)   
+    rst.headers.add('Access-Control-Allow-Origin', '*')
+
+    return rst,200
+
+
+@app.route('/change_user',methods=['GET','POST'])
+def change_user():
+    global model,init,curr_data
+    if request.method == 'POST':
+        get_data = json.loads(request.get_data())
+        curr_data = get_data['dataset']
         
         #save data
-        print('save infos: ',tool.curr_data)
-        save_data = {key:value for key,value in get_data.items() if key!='dataset'}
-        tool.wirteFile(save_data["store_dataset"],save_data)
-        tool.save_data(model,save_data["store_dataset"])
+        print('save tree structures')
+        database_interface.update_exploration_tree(model,curr_user_name,get_data)
 
         # Reset variables
-        tool.curr_data = dataset
-        enumerateVizs = dataInfos[tool.curr_data]['enumerateVizs'] # get all column combination of the VisrootVizs = [vis for vis in enumerateVizs if len(vis.filter)==0]    
-        rootVizs = dataInfos[tool.curr_data]['rootVizs']
-        
-        for vis in enumerateVizs:
-            vis.par_vis = None
-            vis.children = {}
-
-        train_X = []
-        train_y = []
+        for vis in database_interface.get_enumerate_vis(curr_data,isAll=True):
+            database_interface.update_key(curr_data,vis,"par_vis",None)
+            
         init = True
         model = None
     
@@ -389,50 +263,31 @@ def change_user():
     rst.headers.add('Access-Control-Allow-Origin', '*')
     return rst,200
 
-@app.route('/save_dataInfo',methods=['GET','POST'])
-def save_dataInfo():
+@app.route('/update_tr_data',methods=['GET','POST'])
+def update_tr_data():
     if request.method == 'POST':
-        print("save dataInfo")
-        tool.save_dill(tool.dataInfos,tool.dataInfos_path)
-        tool.save_dill(tool.Vis.index,tool.Vis_index_path)
+        get_data = json.loads(request.get_data())
+        Utility.update_train_data(get_data['label_data'],curr_data,curr_user_name)
+        
+    rst = jsonify({})   
+    rst.headers.add('Access-Control-Allow-Origin', '*')
+    
+    return rst,200
 
+
+@app.route('/update_dataset',methods=['GET','POST'])
+def update_dataset():
+    global model,curr_user_name
+    if request.method == 'POST':
+        get_data = json.loads(request.get_data())
+        database_interface.update_exploration_tree(model,curr_user_name,get_data)
+    
     data ={}
     rst = jsonify(data)   
     rst.headers.add('Access-Control-Allow-Origin', '*')
     return rst,200
 
 
-@app.route('/enumerate',methods=['GET','POST'])
-def enumerate_charts():
-    if request.method == 'POST':
-        global dataInfos
-        for dataset,dataInfo in dataInfos.items():
-            stack = [vis for vis in dataInfo['enumerateVizs']]
-            tool.curr_data = dataset
-
-            while len(stack)!=0:
-                # 3 filter depth
-                print("stack length: "+str(len(stack)))
-                userSelectedVis = stack.pop()
-                par_vizs = Utility.getAllParVis(userSelectedVis)
-                
-                for click_item in list(userSelectedVis.subgroup.keys()):
-                    userSelectedInsight = Utility.getUserSelectedInsight(userSelectedVis,click_item)
-                    if not userSelectedInsight:
-                        userSelectedInsight={}
-                        userSelectedInsight['insightType'] = 'none',
-                        userSelectedInsight['key'] = click_item
-                        
-                    type1_visRec,type2_visRec = VisRecommendation.getVisRec(par_vizs,userSelectedInsight,dataInfo['enumerateVizs'])
-                    
-                    if len(type1_visRec)!=0 and len(list(type1_visRec[0].filter.keys()))<=1:
-                        stack.extend(type1_visRec)
-                    if len(type2_visRec)!=0 and len(list(type2_visRec[0].filter.keys()))<=1:
-                        stack.extend(type2_visRec)
-    data ={}
-    rst = jsonify(data)   
-    rst.headers.add('Access-Control-Allow-Origin', '*')
-    return rst,200
 
 if __name__ == "__main__":
     app.run()
