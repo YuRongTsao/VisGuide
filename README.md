@@ -45,11 +45,6 @@ VisGuide applies **Drill-down** and **Comparison** operations to the user-focuse
 ### User Preference Model Training
 VisGuide's user preference model is a linear regression model of chart features that is trained online during a user's interaction processes and transferred when the user explores a new dataset. We map each chart to features and the preference score as label (which the preference score is obtain by the users' interaction with the system)
 
-<p align="center">
-<img src="https://user-images.githubusercontent.com/28348725/169253424-8964d3b3-aa10-4da2-9576-7cef49de71fa.png" >
-</p>
-
-
 **User Preference label:**
 
 We map 4 actions that users interact with the user interface with four-level numeric score from 0 to 1.
