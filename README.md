@@ -40,6 +40,7 @@ VisGuide applies **Drill-down** and **Comparison** operations to the user-focuse
 * Drill-down: it combines the idea of the drill-down operation and the hierarchical structuring, which in effect zooms in to a data subset of interest by applyin filter condition.
 * Comparison: it is designed also based on the hierarchical structuring, which facilitates users' own comparisons of different measures in the same data subset.
 
+![image](https://user-images.githubusercontent.com/28348725/169980825-d0fa1852-67cf-46d8-938d-988096f00f61.png)
 
 ### User Preference Model Training
 VisGuide's user preference model is a linear regression model of chart features that is trained online during a user's interaction processes and transferred when the user explores a new dataset. We map each chart to features and the preference score as label (which the preference score is obtain by the users' interaction with the system)
@@ -56,6 +57,8 @@ We map 4 actions that users interact with the user interface with four-level num
 * Users add a chart from the \textit{Recommendation View} to the \textit{Tree View}: this chart will get score 0.6.
 * Users click the **Star** button: this chart will get score 0.3.
 * Any chart that is neither selected nor labeled: this chart will get score 0.0. 
+
+![image](https://user-images.githubusercontent.com/28348725/169980511-c001f017-2ae6-4208-897a-ff1590ffbbe3.png)
 
 
 **Chart features:**
