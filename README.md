@@ -68,6 +68,9 @@ We map 4 actions that users interact with the user interface with four-level num
 * **(F4) Consistence of generation operations:** This feature calculates the proportion of transitions in the sequence having the same generation operation. 
 * **(F5) Encoding Transitions:** We record the channel encoding transition between two charts to capture a user's preference on the transition of the columns.
 
+![image](https://user-images.githubusercontent.com/28348725/169984096-777eea12-2d7c-4475-81ea-96a733dce4a0.png)
+
+
 **Linear Regression Model:**
 
 A user-oriented recommendation has two aspects: 
