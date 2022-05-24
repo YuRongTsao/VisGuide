@@ -125,6 +125,16 @@ To evaluate   VisGuide’s   adaptive   performance,   we   performed one-way AN
 
 To evaluate the performance of our transfer mechanism, we compared the first four rounds' NDCG scores from the second session using VisGuide against the baseline method. A Kruskal-Wallis test was used as the small sample size in each group. The right figure shows the means and 95\% confidence intervals of the participants' NDCG scores. At the first, second, and fourth rounds, VisGuide received significantly higher NDCG scores than the baseline method did (F=4.5, p=0.03; F=3.83, p=0.05; F=5.2, p=0.02). These results imply that importing a pre-existing user-preference model is likely to provide better initial recommendations to users.
 
+
+## Dataset
+[Download Datasets](https://drive.google.com/drive/folders/13CNfDDpSL_Lyk4QCw4QT9PAJfAulPEzh?usp=sharing)
+
+**Data pipeline framework**
+![image](https://user-images.githubusercontent.com/28348725/169997840-b780c792-e308-47b7-85e4-2005dc545404.png)
+
+
+
+
 ## How to launch VisGuide
 ### Step1: Launch the server 
 Run `server.py` with jupyter notebook
@@ -143,8 +153,6 @@ Run `server.py` with jupyter notebook
 * Change user
 >* click "Change user"
 
-## Dataset
-[Download Datasets](https://drive.google.com/drive/folders/13CNfDDpSL_Lyk4QCw4QT9PAJfAulPEzh?usp=sharing)
 
 **Acknowledgment**
 
